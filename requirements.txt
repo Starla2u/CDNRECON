@@ -1,4 +1,0 @@
-pydig
-pyfiglet
-requests
-shodan
