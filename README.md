@@ -34,6 +34,6 @@ git clone https://github.com/Juuso1337/enumflare
 pip3 install -r requirements.txt
 ```
 ```
-python3 main.py <DOMAIN> <SHODAN_API_KEY> (shodan is optional=
+python3 main.py <DOMAIN.com> <SHODAN_API_KEY>
 ```
 >Strictly for educational purposes. EnumFlare uses publically available data efficiently.
