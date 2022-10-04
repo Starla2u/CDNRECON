@@ -1,39 +1,40 @@
-<img src="https://a.pomf.cat/fuqxrf.png"></img>
+<!--<img src="https://a.pomf.cat/fuqxrf.png"></img>-->
 
-## Tries to find non-proxied IP addresses from a website that uses Cloudflares WAF.
+## CDNRECON - A Content Delivery Network recon tool
 
-<b>EnumFlare is a simple script that scans the target domain for valid subdomains, checks their IP addresses, verifies that they belong to Cloudflare, gets <b>their Ray-IDs, countries and optionally returns data from Shodan for leaked addresses. <i>(if any get found)</i>
+<b>CDNRECON is a reconnaissance tool that tries to find the origin or backend IP address of a website protected by a CDNs reverse proxy. You can use it to get a head start when penetration testing a client protected by one aswell as to find possible misconfigurations on your own server. What ever your use case may be, CDNRECON can also be used as a general recon / scanning tool since it automates some common recon tasks in the process. These include: finding common subdomains, checking for open ports, searching and returning data from Shodan and Censys, testing the IDS / WAF of the target server and more.
 
-<b>Results get saved in to "domain.com-results.txt" in the same directory that EnumFlare is in.
+Shodan and Censys API keys are NOT required. Altough it's recommended to supply them for maximum output, CDNRECON tries other things before using them.
 
-## Checking if the nameservers point to cloudflare (not required)
-<img src="https://a.pomf.cat/cxgydc.png"></img>
+<b>The CDNs CDNRECON detects automatically (or atleast tries to):
+- Cloudflare
+- Akamai
+- Blazingfast
 
-## Checking for common subdomains and their IP addresses
-<img src="https://a.pomf.cat/gcfsdx.png"></img>
-
-## Checks wether the IP addresses belong to Cloudflare or not
-<img src="https://a.pomf.cat/pakcyt.png"></img>
-
-## If leaked addresses are found, it searches them on Shodan
-<img src="https://a.pomf.cat/ihxnkr.png"></img>
-
-<b>To get an API key for shodan, simply sign up on their website at https://shodan.io and head over to the account page.
-
-<img src="https://a.pomf.cat/nadhtv.png"></img>
+<b>Heres some sample output from CDNRECON:
 
 
 
-## Installation and usage guide
->Requires atleast Python 3.6 since it uses f-strings. Tested on Arch Linux. No guarantees that this will work on Windows.
+## Installation and usage
+
+<b>Requires atleast python version 3.6 since it uses f-strings.
+
+<b>Clone the repository
+```
+$ sudo git clone https://github.com/Juuso1337/CDNRECON
+```
+<b>Install the required depencies
+```
+$ cd CDNRECON
+$ pip3 install -r requirements.txt
+```
+<b>Sample usage guide
 
 ```
-git clone https://github.com/Juuso1337/enumflare
+$ python3 main.py example.com shodan-key
 ```
-```
-pip3 install -r requirements.txt
-```
-```
-python3 main.py <DOMAIN.com> <SHODAN_API_KEY>
-```
->Strictly for educational purposes. EnumFlare uses publically available data efficiently.
+<b> For more in-depth usage info, supply the -h flag (python3 main.py -h).
+
+## Censys and Shodan guide
+<b>Register an account on https://search.censys.io/register and https://account.shodan.io/ (it's totally free).
+
