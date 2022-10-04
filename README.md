@@ -18,7 +18,7 @@ Shodan and Censys API keys are NOT required. Altough it's recommended to supply 
 ## Installation and usage
 
 <b>Requires atleast python version 3.6 since it uses f-strings.
->It should work on any Linux distro. Tested on Arch Linux.
+>It should work on any Linux distribution. Tested and working on Arch Linux.
 
 <b>Clone the repository
 ```
