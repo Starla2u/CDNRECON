@@ -116,3 +116,11 @@ options:
 <b>1. Register an account at https://account.shodan.io/ (it's totally free).<br>
 <b>2. Head over the to the "Account" page and see the "API key" field.<br>
   <img src="https://a.pomf.cat/nvdiap.png"></img>
+  
+## To do
+- Add more CDNs
+- Add Censys support
+- Add certificate search
+- Add IPv4 range bruteforcer
+- Add favicon hash search
+- Add html body hash search
