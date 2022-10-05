@@ -1,12 +1,12 @@
-#     ______                      ________              
-#    / ____/___  __  ______ ___  / ____/ /___ _________ 
-#   / __/ / __ \/ / / / __ `__ \/ /_  / / __ `/ ___/ _ \
-#  / /___/ / / / /_/ / / / / / / __/ / / /_/ / /  /  __/
-# /_____/_/ /_/\__,_/_/ /_/ /_/_/   /_/\__,_/_/   \___/ 
+#    __________  _   ______  ________________  _   __
+#   / ____/ __ \/ | / / __ \/ ____/ ____/ __ \/ | / /
+#  / /   / / / /  |/ / /_/ / __/ / /   / / / /  |/ / 
+# / /___/ /_/ / /|  / _, _/ /___/ /___/ /_/ / /|  /  
+# \____/_____/_/ |_/_/ |_/_____/\____/\____/_/ |_/   
 #                                                     
 # Created by @Juuso1337
-# This program tries to find the origin IP address of a website protected by Cloudflare.
-# Download the latest version from github.com/juuso1337/enumflare
+# This program tries to find the origin IP address of a website protected by a reverse proxy
+# Download the latest version from github.com/juuso1337/CDNRECON
 
 ############################################ All libraries required by this program
 import pydig                               # Wrapper for the dig command
@@ -17,41 +17,52 @@ import socket                              # Basic networking
 import threading                           # Threads
 import argparse                            # Parse commmand line arguments
 import shodan                              # IoT search engine
-import pydig                               # DNS resolver
 import time                                # Time
 from lists import *                        # Separate file containing arrays
+import random                              # Random number generator
+from colorama import Fore, Style           # Make ANSII color codes work on Windows
 ############################################
 
-PARSER = argparse.ArgumentParser(description = 'EnumFlare - A simple cloudflare config auditor')
+PARSER = argparse.ArgumentParser(description = 'CDNRECON - A Content Delivery Network recon tool')
 
 PARSER.add_argument('TARGET_DOMAIN', metavar ='domain', help ='Domain to scan')
 PARSER.add_argument('SHODAN_API_KEY', metavar ='shodan', help ='Your Shodan API key', nargs='?')
+PARSER.add_argument('--write', action='store_true', help="Write results to a target.com-results.txt file")
 
 ARGS = PARSER.parse_args()
 
 ###################################### All command line arguments
-TARGET_DOMAIN = ARGS.TARGET_DOMAIN   #
+TARGET_DOMAIN  = ARGS.TARGET_DOMAIN  #
 SHODAN_API_KEY = ARGS.SHODAN_API_KEY #
+WRITE          = ARGS.write          #
 ######################################
 
-######################## All global variables
+######################## Some global variables
 VALID_SUBDOMAINS = []  # Valid subdomains get stored in this list
 IP_ADDRESSES     = []  # Subdomain IP addresses get stored in this list
 NOT_CLOUDFLARE   = []  # Non Cloudflare IP addresses get stored in this list
+AKAMAI           = []  # Akamai IP addresses get stored in this list
 ########################
 
-############################### ANSII color codes
-class COLORS:                 #
-    HEADER = '\033[95m'       #
-    OKBLUE = '\033[94m'       #
-    OKCYAN = '\033[96m'       #
-    OKGREEN = '\033[92m'      #
-    WARNING = '\033[93m'      #
-    FAIL = '\033[91m'         #
-    BOLD = '\033[1m'          #
-    UNDERLINE = '\033[4m'     #
-    RESET = '\033[0m'         #
-###############################
+
+# Start of user-agent string list
+
+USER_AGENT_STRINGS = [
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/37.0.2062.94 Chrome/37.0.2062.94 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/600.8.9 (KHTML, like Gecko) Version/8.0.8 Safari/600.8.9",
+    "Mozilla/5.0 (iPad; CPU OS 7_1_2 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) GSA/6.0.51363 Mobile/11D257 Safari/9537.53",
+    "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36 LBBROWSER",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:37.0) Gecko/20100101 Firefox/37.0",
+    "Mozilla/5.0 (Windows NT 6.2; ARM; Trident/7.0; Touch; rv:11.0; WPDesktop; Lumia 1520) like Gecko",
+    "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.65 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:42.0) Gecko/20100101 Firefox/42.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_6 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11B651 Safari/9537.53"
+]
+
+# End of user-agent string list
 
 ##############################
 #      Define functions      #
@@ -59,80 +70,146 @@ class COLORS:                 #
 
 def IS_POINTING_TO_CF():
 
-        print(f"{COLORS.HEADER}[i]{COLORS.RESET} Checking if {COLORS.HEADER}{TARGET_DOMAIN}{COLORS.RESET} is pointing to Cloudflare nameservers . . .")
+        print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Checking {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} nameservers . . .")
 
         NS_RECORD = pydig.query(TARGET_DOMAIN, "NS")
 
-        if 'cloudflare.com' in str(NS_RECORD):
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} {COLORS.HEADER}{TARGET_DOMAIN}{COLORS.RESET} is pointing to Cloudflares nameservers")
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Cloudflare nameservers: {COLORS.HEADER}{NS_RECORD}{COLORS.RESET}")
+        if  'cloudflare' in str(NS_RECORD):
+            print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} is pointing to Cloudflares nameservers")
+
         else:
-            print(f"{COLORS.FAIL}[-]{COLORS.RESET} {COLORS.HEADER}{TARGET_DOMAIN}{COLORS.RESET} is not pointing to Cloudflares nameservers")
+            print(f"{Fore.RED}[-]{Style.RESET_ALL} {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} is not pointing to Cloudflares nameservers")
+        
+        print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Nameservers: {Fore.MAGENTA}{NS_RECORD}{Style.RESET_ALL}")
 
 def SUB_ENUM():
 
-    print(f"{COLORS.HEADER}[i]{COLORS.RESET} Checking common subdomains . . .")
+    print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Checking common subdomains . . .")
 
     for SUBDOMAIN in SUBDOMAINS:
+        
+        time.sleep(0.5)
 
         URL = f'http://{SUBDOMAIN}.{TARGET_DOMAIN}'      # Requests needs a valid HTTP(s) schema
 
+        AGENT = random.choice(USER_AGENT_STRINGS)
+
+        SUB_ENUM_AGENT = {
+
+            'User-Agent': AGENT,
+        }
+
         try:
-            requests.get(URL)
+            requests.get(URL, headers=SUB_ENUM_AGENT, timeout=5)
 
         except requests.ConnectionError:
+            pass
+        
+        except requests.exceptions.Timeout:
             pass
 
         else:
             FINAL_URL = URL.replace("http://", "")       # (?) socket.gethostbyname doesn't like "http://"
 
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} {COLORS.OKBLUE}{FINAL_URL}{COLORS.RESET} is a valid domain")
+            print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.BLUE}{FINAL_URL}{Style.RESET_ALL} is a valid domain")
             VALID_SUBDOMAINS.append(FINAL_URL)
 
 def SUB_IP():
 
      try:
 
-        print(f"{COLORS.HEADER}[i]{COLORS.RESET} Getting subdomain IP addresses . . .")
+        print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Getting subdomain IP addresses . . .")
 
         for SUBDOMAIN in VALID_SUBDOMAINS:
+
             SUBDOMAIN_IP = socket.gethostbyname(SUBDOMAIN)
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} {COLORS.OKBLUE}{SUBDOMAIN}{COLORS.RESET} has an IP address of {COLORS.OKBLUE}{SUBDOMAIN_IP}{COLORS.RESET}")
+            print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.BLUE}{SUBDOMAIN}{Style.RESET_ALL} has an IP address of {Fore.BLUE}{SUBDOMAIN_IP}{Style.RESET_ALL}")
 
             if SUBDOMAIN_IP in IP_ADDRESSES is not None:
                 pass
+
             else:
                 IP_ADDRESSES.append(SUBDOMAIN_IP)
 
      except socket.gaierror as ge:
-            print(f"{COLORS.FAIL}[-]{COLORS.RESET} Temporary failure in name resolution")
+            print(f"{Fore.RED}[-]{Style.RESET_ALL} Temporary failure in name resolution")
             sys.exit()
 
 def IS_CF_IP():
 
     for IP in IP_ADDRESSES:
 
-            print(f"{COLORS.HEADER}[i]{COLORS.RESET} Checking if {COLORS.OKBLUE}{IP}{COLORS.RESET} is Cloudflare . . .")
+            print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Checking if {Fore.BLUE}{IP}{Style.RESET_ALL} is Cloudflare . . .")
 
-            HEAD = requests.head(f"http://{IP}")
+            AGENT = random.choice(USER_AGENT_STRINGS)
+
+            IS_CF_AGENT = {
+                'User-Agent': AGENT
+            }
+
+            HEAD = requests.head(f"http://{IP}", headers=IS_CF_AGENT)
             HEADERS = HEAD.headers
+            
+            global IP_COUNTRY
 
             IP_COUNTRY = requests.get(f"http://ip-api.com/csv/{IP}?fields=country").text.strip()
             
             if 'CF-ray' in HEADERS is not None:
-                print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} {COLORS.OKCYAN}{IP}{COLORS.RESET} is Cloudflare")
+
+                CLOUDFLARE = True
+
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.CYAN}{IP}{Style.RESET_ALL} is Cloudflare")
                 RAY_ID = HEAD.headers['CF-ray']
-                print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Ray-ID: {COLORS.OKCYAN}{RAY_ID}{COLORS.RESET}")
-                print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Country: {IP_COUNTRY}")
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Ray-ID: {Fore.CYAN}{RAY_ID}{Style.RESET_ALL}")
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Country: {IP_COUNTRY}")
 
             if 'CF-ray' not in HEADERS:
-                print(f"{COLORS.OKGREEN}[!]{COLORS.RESET} {COLORS.FAIL}{IP}{COLORS.RESET} is NOT cloudflare")
-                print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Country: {IP_COUNTRY}")
+                print(f"{Fore.GREEN}[!]{Style.RESET_ALL} {Fore.RED}{IP}{Style.RESET_ALL} is NOT cloudflare")
 
                 if IP in NOT_CLOUDFLARE is not None:
                     pass
                 else:
                     NOT_CLOUDFLARE.append(IP)
+
+def IS_AKAMAI():
+
+    IS_AKAMAI = False
+
+    for IP in NOT_CLOUDFLARE:
+
+        print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Checking if {Fore.BLUE}{IP}{Style.RESET_ALL} is Akamai . . .")
+
+        IS_AKAMAI_AGENT = random.choice(USER_AGENT_STRINGS)
+        
+        AKAMAI_USER_AGENT = {
+            'User-Agent': IS_AKAMAI_AGENT
+        }
+
+        HEAD = requests.head(f"http://{IP}", headers=AKAMAI_USER_AGENT)
+        HEADERS = HEAD.headers
+        SERVER = HEAD.headers['Server']
+
+        if 'x-akamai' in HEADERS is not None:
+
+                IS_AKAMAI = True
+
+                AKAMAI.append(IP)
+
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.CYAN}{IP}{Style.RESET_ALL} is Akamai")
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Country: {IP_COUNTRY}")
+        
+        if 'AkamaiGHost' in SERVER is not None:
+
+                IS_AKAMAI = True
+
+                AKAMAI.append(IP)
+
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.CYAN}{IP}{Style.RESET_ALL} Server detected as {Fore.GREEN}AkamaiGHost{Style.RESET_ALL}")
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Country: {IP_COUNTRY}")
+        
+        if IS_AKAMAI == False:
+
+            print(f"{Fore.GREEN}[!]{Style.RESET_ALL} {Fore.RED}{IP}{Style.RESET_ALL} is NOT Akamai")
 
 def CHECK_TLDS():
 
@@ -150,13 +227,13 @@ def CHECK_TLDS():
 
         else:
             FINAL_URL = URL.replace("http://", "")
-            print(f"{COLORS.HEADER}[i]{COLORS.RESET} Possible TLD found: {COLORS.OKBLUE}{FINAL_URL}{COLORS.RESET}")
+            print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Possible TLD found: {Fore.BLUE}{FINAL_URL}{Style.RESET_ALL}")
 
 
 def SHODAN_LOOKUP():
 
     if not NOT_CLOUDFLARE:
-        print(f"{COLORS.FAIL}[-]{COLORS.RESET} No non Cloudflare IP addresses found\n")
+        print(f"{Fore.RED}[-]{Style.RESET_ALL} No leaked IP addresses found\n")
         sys.exit()
 
     try:
@@ -164,7 +241,7 @@ def SHODAN_LOOKUP():
 
         for IP in NOT_CLOUDFLARE:
 
-            print(f"{COLORS.HEADER}[i]{COLORS.RESET} Shodan results for {COLORS.OKBLUE}{IP}{COLORS.RESET}")
+            print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Shodan results for {Fore.BLUE}{IP}{Style.RESET_ALL}")
 
             RESULTS = API.host(IP)
             COUNTRY = RESULTS["country_name"]
@@ -172,20 +249,43 @@ def SHODAN_LOOKUP():
             HOSTNAME = RESULTS['hostnames']
             DOMAINS = RESULTS['domains']
             PORTS = RESULTS['ports']
+            OS = RESULTS['os']
 
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} ISP: {COLORS.OKBLUE}{ISP}{COLORS.RESET}")
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Country: {COLORS.OKBLUE}{COUNTRY}{COLORS.RESET}")
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Hostname(s): {COLORS.OKBLUE}{HOSTNAME}{COLORS.RESET}")
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Domain(s): {COLORS.OKBLUE}{DOMAINS}{COLORS.RESET}")
-            print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Open port(s): {COLORS.OKBLUE}{PORTS}{COLORS.RESET}")
+            NONE = True
+
+            if ISP is not None:       
+                NONE = False
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} ISP: {Fore.BLUE}{ISP}{Style.RESET_ALL}")
+            
+            if COUNTRY is not None:
+                NONE = False
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Country: {Fore.BLUE}{COUNTRY}{Style.RESET_ALL}")
+            
+            if HOSTNAME is not None:
+                NONE = False
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Hostname(s): {Fore.BLUE}{HOSTNAME}{Style.RESET_ALL}")
+            
+            if DOMAINS is not None:
+                NONE = False
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Domain(s): {Fore.BLUE}{DOMAINS}{Style.RESET_ALL}")
+            
+            if PORTS is not None:
+                NONE = False
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Open port(s): {Fore.BLUE}{PORTS}{Style.RESET_ALL}")
+
+            if OS is not None:
+                NONE = Flase
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Operating system: {Fore.BLUE}{OS}{Style.RESET_ALL}")
+            
+            if NONE == True:
+                print(f"{Fore.RED}[-]{Style.RESET_ALL} No results for {Fore.BLUE}{IP}{Style.RESET_ALL}")
 
     except shodan.APIError as api_error:
-        print(f"{COLORS.FAIL}[-]{COLORS.RESET} No shodan API key supplied or the key is invalid")
-        pass
+        print(f"{Fore.RED}[-]{Style.RESET_ALL} No shodan API key supplied or the key is invalid")
 
 def SEPARATOR():
 
-    print(f"{COLORS.WARNING}={COLORS.RESET}" * 50)
+    print(f"{Fore.YELLOW}={Style.RESET_ALL}" * 50)
 
 def THREAD(FUNCTION):
 
@@ -200,30 +300,33 @@ def MAIN():
 
             START_TIME = time.perf_counter()
 
-            ASCII = Figlet(font='slant')
-            ASCII_RENDER = ASCII.renderText("EnumFlare")
-            print (f"{COLORS.WARNING}{ASCII_RENDER}")
+            ASCII = Figlet(font='slant', width=100)
+            ASCII_RENDER = ASCII.renderText("CDNRECON")
+            print (f"{Fore.YELLOW}{ASCII_RENDER}")
 
             IS_POINTING_TO_CF()
             THREAD(SUB_ENUM)
             THREAD(SUB_IP)
             THREAD(IS_CF_IP)
-            # THREAD(CHECK_TLDS) Work in progress
+            THREAD(IS_AKAMAI)
             THREAD(SHODAN_LOOKUP)
             
-            with open(f"{TARGET_DOMAIN}-results.txt", "w") as FILE:
+            if WRITE == True:
 
-                for SUBDOMAIN in VALID_SUBDOMAINS:
-                        FILE.write(f"VALID SUBDOMAIN: {SUBDOMAIN}\n")
+                with open(f"{TARGET_DOMAIN}-results.txt", "w") as FILE:
 
-                for IP in NOT_CLOUDFLARE:
-                        FILE.write(f"LEAKED IP: {IP}\n")
-                
+                    for SUBDOMAIN in VALID_SUBDOMAINS:
+                            FILE.write(f"VALID SUBDOMAIN: {SUBDOMAIN}\n")
+
+                    for IP in NOT_CLOUDFLARE:
+                            FILE.write(f"LEAKED IP: {IP}\n")
+                    
+                    print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Saved results in {Fore.BLUE}{TARGET_DOMAIN}-results.txt{Style.RESET_ALL}")
+
                 PERF = (time.perf_counter() - START_TIME)
                 TOOK = int(PERF)
 
-                print(f"{COLORS.HEADER}[i]{COLORS.RESET} Finished in {TOOK} seconds")
-                print(f"{COLORS.OKCYAN}[+]{COLORS.RESET} Saved results in {COLORS.OKBLUE}{TARGET_DOMAIN}-results.txt{COLORS.RESET}")
+                print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Finished in {TOOK} seconds")
 
         except KeyboardInterrupt:
             print("[i] Keyboard interrupt detected, exiting...")

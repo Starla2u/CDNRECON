@@ -2,3 +2,4 @@ pydig
 pyfiglet
 requests
 shodan
+colorama
