@@ -7,21 +7,23 @@
 # Created by @Juuso1337
 # This program tries to find the origin IP address of a website protected by a reverse proxy
 # Download the latest version from github.com/juuso1337/CDNRECON
+# Version 0.9.5
 
 ############################################ All libraries required by this program
-import pydig                               # Wrapper for the dig command
-import sys                                 # System-specific parameters and functions
-from pyfiglet import Figlet                # Render ASCII art
-import requests                            # Simple HTTP library
-import socket                              # Basic networking
-import threading                           # Threads
-import argparse                            # Parse commmand line arguments
-import shodan                              # IoT search engine
-import time                                # Time
-from lists import *                        # Separate file containing arrays
-import random                              # Random number generator
-from colorama import Fore, Style           # Make ANSII color codes work on Windows
-############################################
+import pydig                                          # Wrapper for the dig command
+import sys                                            # System-specific parameters and functions
+from pyfiglet import Figlet                           # Render ASCII art
+import requests                                       # Simple HTTP library
+import socket                                         # Basic networking
+import threading                                      # Threads
+import argparse                                       # Parse commmand line arguments
+import shodan                                         # IoT search engine
+import time                                           # Time
+from lists import *                                   # Separate file containing arrays
+import random                                         # Random number generator
+from colorama import Fore, Style                      # Make ANSII color codes work on Windows
+from dnsdumpster.DNSDumpsterAPI import DNSDumpsterAPI # Finds subdomains
+#######################################################
 
 PARSER = argparse.ArgumentParser(description = 'CDNRECON - A Content Delivery Network recon tool')
 
@@ -80,7 +82,41 @@ def IS_POINTING_TO_CF():
         else:
             print(f"{Fore.RED}[-]{Style.RESET_ALL} {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} is not pointing to Cloudflares nameservers")
         
-        print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Nameservers: {Fore.MAGENTA}{NS_RECORD}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Nameservers: {Fore.MAGENTA}{', '.join(NS_RECORD).replace('., ', ', ')[:-1]}{Style.RESET_ALL}")
+
+def DNSDUMPSTER():
+
+    try:
+        RESPONSE = requests.get("https://dnsdumpster.com", verify=True)
+        STATUS_CODE = RESPONSE.status_code
+    
+    except requests.exceptions.ConnectionError:
+        print(f"{Fore.RED}[-]{Style.RESET_ALL} {Fore.MAGENTA}dnsdumpster.com{Style.RESET_ALL} seems to be down, skipping . . .")
+
+    if STATUS_CODE != 200:
+        print(f"{Fore.RED}[-]{Style.RESET_ALL} {Fore.MAGENTA}dnsdumpster.com{Style.RESET_ALL} seems to be down, skipping . . .")
+    
+    else:
+        print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} DNSDumpster output for {Fore.BLUE}{TARGET_DOMAIN}{Style.RESET_ALL}")
+
+        try:
+            RESULTS = DNSDumpsterAPI().search(TARGET_DOMAIN)['dns_records']['host']
+
+            for RESULT in RESULTS:
+
+                DOMAIN = RESULT['domain']
+                RESULT_DOMAIN = DOMAIN.replace("http://", "")
+
+                try:
+                    socket.gethostbyname(RESULT_DOMAIN)
+                    print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.BLUE}{RESULT_DOMAIN}{Style.RESET_ALL} is a valid domain")
+                    VALID_SUBDOMAINS.append(RESULT_DOMAIN)
+
+                except:
+                    pass
+
+        except Exception as e:
+                print(f"{e}")
 
 def SUB_ENUM():
 
@@ -112,7 +148,11 @@ def SUB_ENUM():
             FINAL_URL = URL.replace("http://", "")       # (?) socket.gethostbyname doesn't like "http://"
 
             print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.BLUE}{FINAL_URL}{Style.RESET_ALL} is a valid domain")
-            VALID_SUBDOMAINS.append(FINAL_URL)
+
+            if SUBDOMAIN in VALID_SUBDOMAINS is not None:
+                pass
+            else:
+                VALID_SUBDOMAINS.append(FINAL_URL)
 
 def SUB_IP():
 
@@ -127,7 +167,6 @@ def SUB_IP():
 
             if SUBDOMAIN_IP in IP_ADDRESSES is not None:
                 pass
-
             else:
                 IP_ADDRESSES.append(SUBDOMAIN_IP)
 
@@ -187,7 +226,6 @@ def IS_AKAMAI():
 
         HEAD = requests.head(f"http://{IP}", headers=AKAMAI_USER_AGENT)
         HEADERS = HEAD.headers
-        SERVER = HEAD.headers['Server']
 
         if 'x-akamai' in HEADERS is not None:
 
@@ -198,14 +236,18 @@ def IS_AKAMAI():
                 print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.CYAN}{IP}{Style.RESET_ALL} is Akamai")
                 print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Country: {IP_COUNTRY}")
         
-        if 'AkamaiGHost' in SERVER is not None:
+        if 'Server' in HEADERS is not None:
+            
+            SERVER = HEADERS['Server']
 
-                IS_AKAMAI = True
+            if 'AkamaiGHost' in SERVER is not None:
 
-                AKAMAI.append(IP)
+                    IS_AKAMAI = True
 
-                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.CYAN}{IP}{Style.RESET_ALL} Server detected as {Fore.GREEN}AkamaiGHost{Style.RESET_ALL}")
-                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Country: {IP_COUNTRY}")
+                    AKAMAI.append(IP)
+
+                    print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.CYAN}{IP}{Style.RESET_ALL} Server detected as {Fore.GREEN}AkamaiGHost{Style.RESET_ALL}")
+                    print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Country: {IP_COUNTRY}")
         
         if IS_AKAMAI == False:
 
@@ -274,7 +316,7 @@ def SHODAN_LOOKUP():
                 print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Open port(s): {Fore.BLUE}{PORTS}{Style.RESET_ALL}")
 
             if OS is not None:
-                NONE = Flase
+                NONE = False
                 print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Operating system: {Fore.BLUE}{OS}{Style.RESET_ALL}")
             
             if NONE == True:
@@ -305,6 +347,7 @@ def MAIN():
             print (f"{Fore.YELLOW}{ASCII_RENDER}")
 
             IS_POINTING_TO_CF()
+            THREAD(DNSDUMPSTER)
             THREAD(SUB_ENUM)
             THREAD(SUB_IP)
             THREAD(IS_CF_IP)

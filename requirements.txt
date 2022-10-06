@@ -3,3 +3,4 @@ pyfiglet
 requests
 shodan
 colorama
+dnsdumpster
