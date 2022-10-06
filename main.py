@@ -120,7 +120,7 @@ def DNSDUMPSTER():
                 RESULT_DOMAIN = RESULT['domain']
 
                 try:
-                    print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.BLUE}{RESULT_DOMAIN}{Style.RESET_ALL} is a valid domain")
+                    print(f"{Fore.CYAN}[+] {Style.RESET_ALL} {Fore.BLUE}{RESULT_DOMAIN}{Style.RESET_ALL} seems to be valid")
                     VALID_SUBDOMAINS.append(RESULT_DOMAIN)
 
                 except:
