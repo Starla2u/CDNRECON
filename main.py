@@ -10,8 +10,13 @@
 # Version 0.9.5
 
 ############################################ All libraries required by this program
-import pydig                                          # Wrapper for the dig command
-import sys                                            # System-specific parameters and functions
+import sys                                            #
+import os                                             #
+if os.name == 'nt':                                   #
+    WIN = True                                        #                                              
+else:                                                 #
+    WIN = False                                       #
+    import pydig                                      #
 from pyfiglet import Figlet                           # Render ASCII art
 import requests                                       # Simple HTTP library
 import socket                                         # Basic networking
@@ -22,6 +27,7 @@ import time                                           # Time
 from lists import *                                   # Separate file containing arrays
 import random                                         # Random number generator
 from colorama import Fore, Style                      # Make ANSII color codes work on Windows
+from colorama import init as COLORAMA_INIT            # Colorama init
 from dnsdumpster.DNSDumpsterAPI import DNSDumpsterAPI # Finds subdomains
 #######################################################
 
@@ -46,6 +52,9 @@ NOT_CLOUDFLARE   = []  # Non Cloudflare IP addresses get stored in this list
 AKAMAI           = []  # Akamai IP addresses get stored in this list
 ########################
 
+# Initialize colorama
+
+COLORAMA_INIT(convert=True)
 
 # Start of user-agent string list
 
@@ -72,17 +81,21 @@ USER_AGENT_STRINGS = [
 
 def IS_POINTING_TO_CF():
 
-        print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Checking {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} nameservers . . .")
-
-        NS_RECORD = pydig.query(TARGET_DOMAIN, "NS")
-
-        if  'cloudflare' in str(NS_RECORD):
-            print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} is pointing to Cloudflares nameservers")
+        if WIN == True:
+            pass
 
         else:
-            print(f"{Fore.RED}[-]{Style.RESET_ALL} {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} is not pointing to Cloudflares nameservers")
-        
-        print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Nameservers: {Fore.MAGENTA}{', '.join(NS_RECORD).replace('., ', ', ')[:-1]}{Style.RESET_ALL}")
+            print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Checking {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} nameservers . . .")
+
+            NS_RECORD = pydig.query(TARGET_DOMAIN, "NS")
+
+            if  'cloudflare' in str(NS_RECORD):
+                print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} is pointing to Cloudflares nameservers")
+
+            else:
+                print(f"{Fore.RED}[-]{Style.RESET_ALL} {Fore.MAGENTA}{TARGET_DOMAIN}{Style.RESET_ALL} is not pointing to Cloudflares nameservers")
+            
+            print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Nameservers: {Fore.MAGENTA}{', '.join(NS_RECORD).replace('., ', ', ')[:-1]}{Style.RESET_ALL}")
 
 def DNSDUMPSTER():
 
@@ -107,7 +120,6 @@ def DNSDUMPSTER():
                 RESULT_DOMAIN = RESULT['domain']
 
                 try:
-                    socket.gethostbyname(RESULT_DOMAIN)
                     print(f"{Fore.CYAN}[+]{Style.RESET_ALL} {Fore.BLUE}{RESULT_DOMAIN}{Style.RESET_ALL} is a valid domain")
                     VALID_SUBDOMAINS.append(RESULT_DOMAIN)
 
@@ -367,7 +379,7 @@ def MAIN():
             THREAD(IS_CF_IP)
             THREAD(IS_AKAMAI)
             THREAD(SHODAN_LOOKUP)
-            
+    
             if WRITE == True:
 
                 with open(f"{TARGET_DOMAIN}-results.txt", "w") as FILE:
@@ -380,10 +392,10 @@ def MAIN():
                     
                     print(f"{Fore.CYAN}[+]{Style.RESET_ALL} Saved results in {Fore.BLUE}{TARGET_DOMAIN}-results.txt{Style.RESET_ALL}")
 
-                PERF = (time.perf_counter() - START_TIME)
-                TOOK = int(PERF)
+            PERF = (time.perf_counter() - START_TIME)
+            TOOK = int(PERF)
 
-                print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Finished in {TOOK} seconds")
+            print(f"{Fore.MAGENTA}[i]{Style.RESET_ALL} Finished in {TOOK} seconds")
 
         except KeyboardInterrupt:
             print("[i] Keyboard interrupt detected, exiting...")
