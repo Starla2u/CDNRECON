@@ -1,6 +1,6 @@
 ## CDNRECON - A Content Delivery Network recon tool
 
-<b>CDNRECON is a reconnaissance tool that tries to find the origin or backend IP address of a website protected by a CDNs reverse proxy. You can use it to get a head start when penetration testing a client protected by one aswell as to find possible misconfigurations on your own server. What ever your use case may be, CDNRECON can also be used as a general recon / scanning tool since it automates some common recon tasks in the process. These include: finding common subdomains, checking for open ports, searching and returning data from Shodan, testing the WAF of the target server and more.
+<b>CDNRECON is a reconnaissance tool that tries to find the origin or backend IP address of a website protected by a CDNs reverse proxy. You can use it to get a head start when penetration testing a client protected by one aswell as to find possible misconfigurations on your own server. What ever your use case may be, CDNRECON can also be used as a general recon / scanning tool since it automates some common recon tasks in the process. These include: finding common subdomains, dumping DNS records, checking for open ports, searching and returning data from Shodan, testing the WAF of the target server and more.
 
 Shodan API keys are NOT required. Altough it's recommended to supply them for maximum output, CDNRECON tries other things before using them.
 
