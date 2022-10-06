@@ -104,8 +104,7 @@ def DNSDUMPSTER():
 
             for RESULT in RESULTS:
 
-                DOMAIN = RESULT['domain']
-                RESULT_DOMAIN = DOMAIN.replace("http://", "")
+                RESULT_DOMAIN = RESULT['domain']
 
                 try:
                     socket.gethostbyname(RESULT_DOMAIN)
@@ -124,7 +123,8 @@ def SUB_ENUM():
 
     for SUBDOMAIN in SUBDOMAINS:
         
-        time.sleep(0.5)
+        if SUBDOMAIN in VALID_SUBDOMAINS is not None:
+            pass
 
         URL = f'http://{SUBDOMAIN}.{TARGET_DOMAIN}'      # Requests needs a valid HTTP(s) schema
 
@@ -186,9 +186,16 @@ def IS_CF_IP():
                 'User-Agent': AGENT
             }
 
-            HEAD = requests.head(f"http://{IP}", headers=IS_CF_AGENT)
-            HEADERS = HEAD.headers
+            try:
+                HEAD = requests.head(f"http://{IP}", headers=IS_CF_AGENT, timeout=5)
+                HEADERS = HEAD.headers
             
+            except ConnectionError:
+                print(f"{Fore.RED}[-]{Style.RESET_ALL} Couldn't connect to {Fore.BLUE}{IP}{Style.RESET_ALL}, skipping . . .")
+            
+            except requests.exceptions.ConnectTimeout:
+                print(f"{Fore.RED}[-]{Style.RESET_ALL} Connection to {Fore.BLUE}{IP}{Style.RESET_ALL} timed out, skipping . . .")
+
             global IP_COUNTRY
 
             IP_COUNTRY = requests.get(f"http://ip-api.com/csv/{IP}?fields=country").text.strip()
@@ -224,8 +231,15 @@ def IS_AKAMAI():
             'User-Agent': IS_AKAMAI_AGENT
         }
 
-        HEAD = requests.head(f"http://{IP}", headers=AKAMAI_USER_AGENT)
-        HEADERS = HEAD.headers
+        try:
+            HEAD = requests.head(f"http://{IP}", headers=AKAMAI_USER_AGENT)
+            HEADERS = HEAD.headers
+        
+        except ConnectionError:
+            print(f"{Fore.RED}[-]{Style.RESET_ALL} Couldn't connect to {Fore.BLUE}{IP}{Style.RESET_ALL}, skipping . . .")
+
+        except requests.exceptions.ConnectTimeout:
+            print(f"{Fore.RED}[-]{Style.RESET_ALL} Connection to {Fore.BLUE}{IP}{Style.RESET_ALL} timed out, skipping . . .")
 
         if 'x-akamai' in HEADERS is not None:
 
